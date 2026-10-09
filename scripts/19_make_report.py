@@ -126,6 +126,7 @@ def build():
 {table(rl)}
 <div class="grid">{img("read_filter_reasons.png", "Per-read pigeon filter outcome (QC-pass cells).")}
 {img("read_structural_category.png", "Structural category of passing reads.")}</div>
+<p>Kit: 10x 3′ v3.x (12 bp UMI; 100% of called cell barcodes are in the 3′ v3 whitelist, ~1% in the 5′ whitelist). With long reads the whole molecule is sequenced, so coverage reflects where molecules start (RT reaching the cap) and end (oligo-dT priming site), not the kit's barcode end.</p>
 <p>Among passing reads assigned to known transcripts, 5′-fragments (missing 3′ exons) are 8.5% / 7.3% and 3′-fragments (missing 5′ exons) 3.0% (day 0 / day 4). The mild 5′-high coverage therefore reflects early 3′ ends (residual internal priming, proximal polyA sites upstream of long annotated UTRs) rather than RT truncation.</p>
 
 <h2 id="cells">Cells and embeddings</h2>

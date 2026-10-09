@@ -51,9 +51,14 @@ pm = pd.DataFrame(rows, columns=["panel", "gene"]).join(de[["pb_log2FC", "pvals_
 pm.to_csv(f"{TAB}/marker_panel.tsv", sep="\t", index=False)
 print(pm.to_string())
 pm["gene"] = pd.Categorical(pm.gene, categories=pm.gene[::-1])
-p = (ggplot(pm, aes("pb_log2FC", "gene", fill="panel")) + geom_col() + geom_vline(xintercept=0)
-     + theme_bw() + labs(x="pseudobulk log2FC (day4 / day0)", y=""))
-p.save(f"{FIG}/marker_panel.png", width=6, height=8, dpi=150)
+pm["panel"] = pd.Categorical(pm.panel, categories=list(panels))
+pm["sig"] = np.where(pm.pvals_adj < 0.05, "FDR < 0.05", "n.s.")
+p = (ggplot(pm, aes("gene", "pb_log2FC", fill="panel", alpha="sig")) + geom_col() + geom_hline(yintercept=0)
+     + coord_flip() + facet_grid("panel ~ .", scales="free_y", space="free_y")
+     + scale_alpha_manual(values={"FDR < 0.05": 1.0, "n.s.": 0.35}, name="")
+     + theme_bw() + theme(strip_text_y=element_text(angle=0), legend_position="none")
+     + labs(y="pseudobulk log2FC (day4 / day0)", x=""))
+p.save(f"{FIG}/marker_panel.png", width=6.5, height=8, dpi=150)
 
 # GSEA on pseudobulk fold change of genes expressed in >= 5% of cells in either day
 rnk = de[(de[["pct_day0", "pct_day4"]].max(1) >= 0.05) & ~de.index.str.startswith(("ENSG", "novel"))].pb_log2FC

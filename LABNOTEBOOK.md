@@ -2,7 +2,7 @@
 
 ## Data
 
-PacBio Kinnex single-cell (10x Genomics 3' v3.x, 12 bp UMI), Revio, one library per time point of hFOB 1.19 osteoblast differentiation: day 0 and day 4. Inputs are SMRT Link outputs (skera → isoseq tag/refine/correct/groupdedup → pbmm2 to hg38, GENCODE v39 → isoseq collapse → pigeon) run separately per sample. hFOB 1.19 carries a temperature-sensitive SV40 large T antigen (tsA58): cells proliferate at 33.5 °C and differentiate at 39.5 °C, where large T is inactive.
+PacBio Kinnex single-cell (10x Genomics 3' v3.x: 12 bp UMI, and 100% of called cell barcodes are in the 3' v3 `3M-february-2018` whitelist (reverse complement) vs ~1% in the 5' `737K-august-2016` list), Revio, one library per time point of hFOB 1.19 osteoblast differentiation: day 0 and day 4. Inputs are SMRT Link outputs (skera → isoseq tag/refine/correct/groupdedup → pbmm2 to hg38, GENCODE v39 → isoseq collapse → pigeon) run separately per sample. hFOB 1.19 carries a temperature-sensitive SV40 large T antigen (tsA58): cells proliferate at 33.5 °C and differentiate at 39.5 °C, where large T is inactive.
 
 ## Pipeline
 

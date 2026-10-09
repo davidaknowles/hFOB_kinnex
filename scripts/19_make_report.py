@@ -1,5 +1,6 @@
 """Self-contained HTML report (figures embedded as base64) from results/figures and results/tables."""
 import sys, os, base64, html
+import numpy as np
 import pandas as pd
 
 R = sys.argv[1]
@@ -7,7 +8,12 @@ OUT = f"{R}/report.html"
 FIG, TAB = f"{R}/figures", f"{R}/tables"
 
 
+MODE = "html"  # "html": self-contained, images embedded; "md": GitHub-rendered markdown, images linked
+
+
 def img(path, caption, width="100%"):
+    if MODE == "md":
+        return f'<p><img src="figures/{path}" width="{width}" alt="{html.escape(caption)}"><br><em>{caption}</em></p>\n'
     with open(f"{FIG}/{path}", "rb") as f:
         b = base64.b64encode(f.read()).decode()
     return (f'<figure><img src="data:image/png;base64,{b}" style="max-width:{width}" alt="{html.escape(caption)}">'
@@ -31,6 +37,41 @@ kb = kb.pivot_table(index="event", columns="sample", values=["PSI", "total_reads
 kb.columns = [f"{a} {b}" for a, b in kb.columns]
 kb["ΔPSI"] = kb["PSI day4"] - kb["PSI day0"]
 kb = kb[["PSI day0", "PSI day4", "ΔPSI", "total_reads day0", "total_reads day4"]].astype({"total_reads day0": int, "total_reads day4": int})
+# cluster annotation
+ca = pd.read_csv(f"{TAB}/cluster_annotation.tsv", sep="\t", dtype={"leiden": str}).set_index("leiden")
+cl_lab = pd.read_csv(f"{TAB}/cluster_labels.tsv", sep="\t", dtype={"leiden": str}).set_index("leiden")
+ca = cl_lab.join(ca)
+ca["day"] = np.where(ca.frac_day4 > 0.5, "day 4", "day 0")
+ca["markers (top 10)"] = ca.top_markers.str.split(", ").str[:10].str.join(", ")
+cat = ca.reset_index()[["leiden", "day", "label", "n", "frac_day4", "umis", "genes", "frac_G1", "frac_S", "frac_G2M",
+                        "markers (top 10)", "hallmark_ORA"]].sort_values(["day", "leiden"])
+cat = cat.astype({"n": int, "umis": int, "genes": int})
+
+# sc-SHC results (if available)
+SC = sys.argv[2] if len(sys.argv) > 2 else None  # sc-SHC output directory
+def scshc_html():
+    if SC is None or not os.path.exists(f"{SC}/day0_testClusters.tsv"):
+        return "<p class=\"muted\">sc-SHC results not yet available.</p>"
+    out, rows = [], []
+    for s in ["day0", "day4"]:
+        if not os.path.exists(f"{SC}/{s}_testClusters.tsv"):
+            continue
+        t = pd.read_csv(f"{SC}/{s}_testClusters.tsv", sep="\t", dtype=str)
+        merged = t.groupby("scshc_merged").leiden.apply(lambda x: "+".join(sorted(x.unique(), key=int)))
+        row = [s, t.leiden.nunique(), t.scshc_merged.nunique(), "; ".join(merged.values)]
+        if os.path.exists(f"{SC}/{s}_denovo.tsv"):
+            d = pd.read_csv(f"{SC}/{s}_denovo.tsv", sep="\t", dtype=str)
+            row.append(d.scshc_denovo.nunique())
+            ct = pd.crosstab(d.leiden, d.scshc_denovo)
+            ct = ct.loc[ct.sum(1) >= 20]
+            out.append(f"<h3>{s}: de novo sc-SHC clusters vs Leiden</h3>" + ct.to_html(border=0, classes="tbl"))
+        else:
+            row.append("running")
+        rows.append(row)
+    tb = pd.DataFrame(rows, columns=["day", "Leiden clusters tested (≥20 cells)", "significant clusters after sc-SHC merging",
+                                     "groups (merged Leiden clusters)", "de novo sc-SHC clusters"])
+    return table(tb) + "".join(out)
+
 iso_figs = ["RPS24", "CIRBP", "H1-2", "TPM2", "TPM1", "CALD1", "HNRNPDL", "SRSF2", "SRSF3"]
 
 css = """
@@ -52,11 +93,12 @@ figcaption { color:var(--muted); font-size:13px; margin-top:4px; max-width:900px
 .callout { background:var(--card); border-left:3px solid var(--accent); padding:10px 14px; border-radius:4px; max-width:900px; }
 """
 
-body = f"""
+def build():
+    return f"""
 <h1>hFOB 1.19 Kinnex single-cell long-read: day 4 vs day 0</h1>
 <p class="muted">PacBio Kinnex (10x 3′ v3.x) on hFOB 1.19 osteoblasts, one library per time point. Generated 2026-10-09.</p>
 <nav><a href="#summary">Summary</a><a href="#methods">Methods</a><a href="#qc">Read QC</a><a href="#cells">Cells</a>
-<a href="#de">Expression</a><a href="#events">Events</a><a href="#biology">Known biology</a><a href="#caveats">Caveats</a></nav>
+<a href="#subpops">Subpopulations</a><a href="#de">Expression</a><a href="#events">Events</a><a href="#biology">Known biology</a><a href="#caveats">Caveats</a></nav>
 
 <h2 id="summary">Summary</h2>
 <ul>
@@ -92,6 +134,16 @@ body = f"""
 {img("umap_sample.png", "UMAPs on gene expression, isoform expression and isoform usage, coloured by day.")}
 {img("umap_phase.png", "Cell-cycle phase (Seurat 2019 S/G2M genes). Day 0: 62% G2M; day 4: 46% G1.")}
 {img("umap_markers.png", "Marker genes on the gene-expression UMAP (log-normalised).")}
+
+<h2 id="subpops">Subpopulations</h2>
+<p>Leiden clusters on the gene-expression graph (all cells, resolution 0.5) were annotated with within-day one-vs-rest Wilcoxon markers (excluding ribosomal, mitochondrial and unannotated genes), Hallmark over-representation of the top 150 markers, cell-cycle phase, and curated state scores (scanpy score_genes).</p>
+<div class="grid">{img("umap_leiden_labeled.png", "Leiden clusters on the gene-expression UMAP.")}
+{img("cluster_state_scores.png", "Mean state scores per cluster, z-scored across clusters.")}</div>
+{table(cat, digits=2)}
+<p>Day 0 subclusters are mainly cell-cycle phases (G1/S, S/G2 with histone mRNAs, G2/M), plus a mesenchymal / EMT-high group, a small interferon-response group (213 cells) and a low-complexity ribosome/OXPHOS-high group. Day 4 has an ECM-producing majority (POSTN, FN1, COL4A1, INHBA), a mesenchymal group with the highest osteoblast score (SPARC, COL1A1), a low-complexity group matching day 0 cluster 4, and a small p53/stress group (GADD45A, PLK2, AREG) that includes 26 day 0 cells. Part of day 0 cluster 3 bridges toward day 4 cluster 7, suggesting a day 0 subset already resembling the day 4 mesenchymal state. The two low-complexity clusters (fewest genes and UMIs, short housekeeping transcripts) may be smaller or lower-quality cells rather than a distinct biological state.</p>
+<h3>Are the clusters statistically supported? sc-SHC</h3>
+<p>sc-SHC (Grabski, Street &amp; Irizarry 2023, Nat Methods) tests each split of a cluster hierarchy against a null of a single population (Gaussian-copula model of the counts fitted to the merged cells), controlling the family-wise error rate (α = 0.05). It was run per day on raw gene counts (2,500 features, 30 PCs): <code>testClusters</code> on the Leiden labels (clusters with ≥ 20 cells in that day), which merges clusters that are not significantly different, and <code>scSHC</code> for de novo significance-based clustering.</p>
+{scshc_html()}
 
 <h2 id="de">Differential expression, day 4 vs day 0</h2>
 <p>1,501 genes up and 1,553 down.</p>
@@ -136,8 +188,17 @@ body = f"""
 </ul>
 """
 
+body = build()
 page = f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>hFOB Kinnex Report</title><style>{css}</style></head><body><main>{body}</main></body></html>"""
 with open(OUT, "w") as f:
     f.write(page)
 print(OUT, round(os.path.getsize(OUT) / 1e6, 1), "MB")
+
+# GitHub-rendered markdown version (GitHub shows .html files as source, not rendered)
+MODE = "md"
+md = build().replace("<nav>", "<p>").replace("</nav>", "</p>").replace('<div class="grid">', "<div>")
+md = md.replace(' style="max-width:520px"', "").replace("</a><a", "</a> · <a").replace("</a>\n<a", "</a> · <a")
+with open(f"{R}/REPORT.md", "w") as f:
+    f.write(md)
+print(f"{R}/REPORT.md", round(os.path.getsize(f"{R}/REPORT.md") / 1e3, 1), "kB")

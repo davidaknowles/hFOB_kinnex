@@ -5,7 +5,8 @@ Processing and analysis of PacBio Kinnex single-cell (10x 3') long-read data fro
 - `hfob_kinnex/` reusable functions (counts, single-cell helpers, event definitions, quasi-binomial usage test, plots)
 - `scripts/` numbered pipeline steps, run in order
 - `results/figures`, `results/tables` outputs
-- `results/report.html` self-contained HTML report (download and open in a browser)
+- [`results/REPORT.md`](results/REPORT.md) report, rendered on GitHub
+- `results/report.html` same report as a single self-contained HTML file (download and open in a browser; GitHub does not render HTML)
 - `LABNOTEBOOK.md` methods and findings
 
 Tools: isoseq (collapse), pigeon (classify/filter), samtools, SUPPA2, RSeQC, scanpy, gseapy, satuRn. Python dependencies are installed with uv; isoseq and pigeon come from bioconda.

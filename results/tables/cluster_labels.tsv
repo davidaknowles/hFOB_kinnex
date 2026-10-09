@@ -1,0 +1,11 @@
+leiden	label	evidence
+0	cycling G2/M	CCNB1, TOP2A, CENPF, AURKA; 100% G2M; Hallmark G2-M checkpoint
+1	cycling S/G2, histone-high	replication-dependent histones, RRM2, ATAD2, HELLS; E2F targets
+5	cycling G1/S	MCM6, SLBP, CDCA7, UNG, MSH6; 53% S phase
+3	mesenchymal / EMT-high	VIM, ITGB1, TGFBI, LOXL2, IGFBP3, EGR1; Hallmark EMT; part bridges to day 4 cluster 7
+4	low-complexity, ribosome/OXPHOS-high	fewest genes (median 1,325) and UMIs; short housekeeping transcripts (SEC61G, MYL6, TXN, FTH1); possibly small or lower-quality cells
+6	interferon response	ISG15, IFIT1-3, OASL, DDX58, IRF1; Hallmark IFN-α/γ
+2	stress / DNA damage (mixed day)	GADD45A, PLK2, AREG, PTTG1, CDKN3, histones, snoRNA hosts; Hallmark p53; highest SR poison-exon inclusion
+7	mesenchymal, osteoblast-high	SPARC, COL1A1, VIM, ID3, GAS1, STC2; highest osteoblast score; mostly G1
+8	ECM-producing, S/G1-arrested	POSTN, FN1, COL4A1, INHBA, FBN1/2, THBS1, SERPINE2; Hallmark EMT, angiogenesis, hypoxia; largest day 4 cluster
+9	low-complexity, ribosome/OXPHOS-high	day 4 counterpart of cluster 4; 70% G1

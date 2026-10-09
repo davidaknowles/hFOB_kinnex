@@ -34,6 +34,8 @@ def build_anndata(read_cell, group_long, classification, gene_col="associated_ge
                       shape=(len(cells), len(isos)))
     var = cls.loc[isos].copy()
     var["gene"] = var[gene_col].astype(str)
+    for c in var.columns[var.dtypes == object]:
+        var[c] = var[c].astype(str)
     obs = pd.DataFrame(index=cells)
     obs["sample"] = [c.split("_")[0] for c in cells]
     return ad.AnnData(X=X, obs=obs, var=var)

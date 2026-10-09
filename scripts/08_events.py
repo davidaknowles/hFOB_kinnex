@@ -21,7 +21,7 @@ X = iso.X.tocsr()
 day4 = (iso.obs["sample"] == "day4").values
 tot = np.asarray(X.sum(0)).ravel()
 expressed = iso.var_names[tot >= MIN_READS_ISO]
-gene = iso.var.gene
+gene = iso.var.gene.astype(str)
 print("cells", iso.n_obs, "isoforms", iso.n_vars, "expressed isoforms", len(expressed), flush=True)
 
 # ---- SUPPA2 local events on expressed isoforms
@@ -44,7 +44,16 @@ ioe = pd.concat([read_ioe(f"{EV}/suppa_{t}_strict.ioe") for t in ["SE", "A5", "A
 # map PB gene id -> associated gene name via the inclusion transcripts
 ioe["gene_name"] = [gene.get(l[0], "NA") for l in ioe.total]
 Inc, Tot = incidence(ioe.incl, iso.var_names), incidence(ioe.total, iso.var_names)
-Y, N = (X @ Inc).tocsr(), (X @ Tot).tocsr()
+# restrict to events with pooled support (>= 50 reads in each day) before forming cell x event matrices
+# per-day pooled inclusion / total reads for all events (used for detection counts)
+ioe_all = ioe.copy()
+py = np.vstack([np.asarray(X[m].sum(0)).ravel() @ Inc for m in (~day4, day4)])
+pn = np.vstack([np.asarray(X[m].sum(0)).ravel() @ Tot for m in (~day4, day4)])
+keep_ev = (pn >= 50).all(0)
+print("SUPPA events", len(ioe), "with >=50 reads per day", keep_ev.sum(), flush=True)
+ioe = ioe.loc[keep_ev].reset_index(drop=True)
+Inc, Tot = Inc[:, keep_ev], Tot[:, keep_ev]
+Y, N = (X @ Inc).tocsc(), (X @ Tot).tocsc()
 
 # ---- TSS / polyA-site clusters on expressed isoforms
 ex = read_gtf_exons(gtf)
@@ -53,6 +62,10 @@ cnt = pd.Series(tot, index=iso.var_names)
 res_ends = {}
 for which, win in [("tss", 50), ("tes", 100)]:
     lab, cl = end_clusters(tx, gene, cnt, which=which, window=win)
+    # end support: TSS within a refTSS (CAGE) peak; 3' end with an upstream polyA signal
+    sup = (iso.var.within_CAGE_peak.astype(str) == "True") if which == "tss" else iso.var.polyA_motif.astype(str).ne("nan")
+    sw = pd.DataFrame({"cluster": lab, "w": cnt.loc[lab.index] * sup.loc[lab.index].astype(float)}).groupby("cluster").w.sum()
+    cl["supported_frac"] = (sw.reindex(cl.index) / cl["count"].replace(0, np.nan)).values
     term = classify_terminal(cl, min_frac=0.1, min_count=20)
     cl.to_csv(f"{TAB}/{which}_clusters.tsv", sep="\t")
     term.to_csv(f"{TAB}/{which}_alt_genes.tsv", sep="\t", index=False)
@@ -61,7 +74,7 @@ for which, win in [("tss", 50), ("tes", 100)]:
     gidx = gnames.get_indexer(cl.loc[groups, "gene"])
     Yc = (X @ M).tocsr()
     Nc = ((X @ G).tocsc()[:, gidx]).tocsr()
-    res_ends[which] = (Yc, Nc, cl.loc[groups].reset_index(), term)
+    res_ends[which] = (Yc, Nc, cl.loc[groups].rename_axis("cluster").reset_index(), term)
 
 # ---- detectability: pooled and per day. An event is detected if total reads >= 20 and 0.05 <= PSI <= 0.95
 def detected(Y, N, mask, min_n=20, lo=0.05, hi=0.95):
@@ -71,11 +84,15 @@ def detected(Y, N, mask, min_n=20, lo=0.05, hi=0.95):
 
 rows = []
 allc = np.ones(iso.n_obs, bool)
+def detected_sums(y, n, min_n=20, lo=0.05, hi=0.95):
+    psi = np.divide(y, n, out=np.full_like(y, np.nan, dtype=float), where=n > 0)
+    return (n >= min_n) & (psi >= lo) & (psi <= hi)
+
 for t in ["SE", "A5", "A3", "MX", "RI", "AF", "AL"]:
-    m = (ioe.type == t).values
-    for s, mask in [("pooled", allc), ("day0", ~day4), ("day4", day4)]:
-        d = detected(Y[:, m], N[:, m], mask)
-        rows.append((t, s, m.sum(), d.sum(), ioe.loc[m].loc[d].gene_name.nunique()))
+    m = (ioe_all.type == t).values
+    for s, (y, n) in [("pooled", (py.sum(0), pn.sum(0))), ("day0", (py[0], pn[0])), ("day4", (py[1], pn[1]))]:
+        d = detected_sums(y[m], n[m])
+        rows.append((t, s, m.sum(), d.sum(), ioe_all.loc[m].loc[d].gene_name.nunique()))
 for which, label in [("tss", "alt TSS"), ("tes", "alt polyA")]:
     Yc, Nc, cl, term = res_ends[which]
     for s, mask in [("pooled", allc), ("day0", ~day4), ("day4", day4)]:
@@ -83,8 +100,12 @@ for which, label in [("tss", "alt TSS"), ("tes", "alt polyA")]:
         # genes with >= 2 detected clusters
         gd = cl.loc[d].groupby("gene").size()
         rows.append((label, s, cl.gene.nunique(), (gd >= 2).sum(), (gd >= 2).sum()))
-    rows.append((label + " (distinct terminal exon)", "pooled", len(term), term.distinct_exons.sum(), term.distinct_exons.sum()))
-    rows.append((label + " (tandem, same exon)", "pooled", len(term), term.tandem.sum(), term.tandem.sum()))
+        if s == "pooled":
+            gs = cl.loc[d & (cl.supported_frac >= 0.5).values].groupby("gene").size()
+            sl = "CAGE-supported" if which == "tss" else "polyA-signal-supported"
+            rows.append((f"{label} ({sl})", s, cl.gene.nunique(), (gs >= 2).sum(), (gs >= 2).sum()))
+    rows.append((label + " (distinct terminal exon)", "pooled", cl.gene.nunique(), term.distinct_exons.sum(), term.distinct_exons.sum()))
+    rows.append((label + " (tandem, same exon)", "pooled", cl.gene.nunique(), term.tandem.sum(), term.tandem.sum()))
 det = pd.DataFrame(rows, columns=["event_type", "cells", "n_defined", "n_detected", "n_genes_detected"])
 det.to_csv(f"{TAB}/event_detection.tsv", sep="\t", index=False)
 print(det.to_string(), flush=True)
@@ -97,7 +118,7 @@ r.to_csv(f"{TAB}/diff_events.tsv.gz", sep="\t", index=False)
 summ = [("local:" + t, d.testable.sum(), d.sig.sum(), d[d.sig].gene_name.nunique()) for t, d in r.groupby("type")]
 for which, label in [("tss", "TSS cluster"), ("tes", "polyA cluster")]:
     Yc, Nc, cl, term = res_ends[which]
-    multi = cl.groupby("gene").cluster.transform("size").values >= 2
+    multi = cl.groupby("gene")["gene"].transform("size").values >= 2
     rr = quasibinomial_two_group(Yc[:, multi], Nc[:, multi], day4)
     rr = pd.concat([cl.loc[multi].reset_index(drop=True), rr], axis=1)
     rr["sig"] = (rr.padj < 0.05) & (rr.dPSI.abs() >= DPSI)
@@ -106,11 +127,11 @@ for which, label in [("tss", "TSS cluster"), ("tes", "polyA cluster")]:
 
 # isoform-level DTU with the same model (isoform count vs gene total)
 G, gnames = group_incidence(gene, iso.var_names)
-gidx = gnames.get_indexer(gene)
-Ng = ((X @ G).tocsc()[:, gidx]).tocsr()
 niso = gene.map(gene[tot >= MIN_READS_ISO].value_counts()).fillna(0).values
 multi = (niso >= 2) & (tot >= MIN_READS_ISO)
-ri = quasibinomial_two_group(X[:, multi], Ng[:, multi], day4)
+gidx = gnames.get_indexer(gene[multi])
+Ng = (X @ G).tocsc()[:, gidx]
+ri = quasibinomial_two_group(X.tocsc()[:, multi], Ng, day4)
 ri.insert(0, "isoform", iso.var_names[multi]); ri.insert(1, "gene", gene.values[multi])
 ri = pd.concat([ri, iso.var.loc[iso.var_names[multi], ["structural_category", "associated_transcript", "subcategory",
                                                      "coding", "predicted_NMD"]].reset_index(drop=True)], axis=1)

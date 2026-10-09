@@ -33,7 +33,7 @@ p.save(f"{FIG}/cell_qc_scatter.png", width=8, height=3.5, dpi=150)
 
 g = g[keep].copy(); iso = iso[keep].copy()
 # drop features with no counts after filtering
-g = g[:, np.asarray(g.X.sum(0)).ravel() > 0].copy()
+g = g[:, np.asarray((g.X > 0).sum(0)).ravel() >= 10].copy()
 iso = iso[:, np.asarray(iso.X.sum(0)).ravel() > 0].copy()
 
 # gene-level embedding

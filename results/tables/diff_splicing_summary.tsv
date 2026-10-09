@@ -1,0 +1,11 @@
+test	n_tested	n_sig	n_genes_sig
+local:A3	6720	681	516
+local:A5	8124	954	647
+local:AF	31991	5877	1282
+local:AL	13890	3030	1095
+local:MX	1805	491	309
+local:RI	3079	440	300
+local:SE	14672	1845	1258
+TSS cluster	52481	3022	1823
+polyA cluster	99378	3879	2470
+isoform usage (DTU)	160762	4608	3215

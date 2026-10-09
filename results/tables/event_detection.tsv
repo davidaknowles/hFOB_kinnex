@@ -1,0 +1,34 @@
+event_type	cells	n_defined	n_detected	n_genes_detected
+SE	pooled	20022	11701	5126
+SE	day0	20022	10086	4660
+SE	day4	20022	9462	4538
+A5	pooled	12399	7939	3274
+A5	day0	12399	6525	2937
+A5	day4	12399	6267	2826
+A3	pooled	10667	6746	2994
+A3	day0	10667	5241	2628
+A3	day4	10667	5313	2595
+MX	pooled	3882	3145	1340
+MX	day0	3882	2516	1166
+MX	day4	3882	2145	1002
+RI	pooled	4842	3030	1478
+RI	day0	4842	2533	1302
+RI	day4	4842	2387	1247
+AF	pooled	65910	53064	3754
+AF	day0	65910	42381	3320
+AF	day4	65910	38589	3295
+AL	pooled	36534	31314	5004
+AL	day0	36534	24021	4325
+AL	day4	36534	20867	3990
+alt TSS	pooled	24763	8185	8185
+alt TSS (CAGE-supported)	pooled	24763	895	895
+alt TSS	day0	24763	7534	7534
+alt TSS	day4	24763	7573	7573
+alt TSS (distinct terminal exon)	pooled	24763	4423	4423
+alt TSS (tandem, same exon)	pooled	24763	3435	3435
+alt polyA	pooled	24763	9509	9509
+alt polyA (polyA-signal-supported)	pooled	24763	3314	3314
+alt polyA	day0	24763	8870	8870
+alt polyA	day4	24763	8806	8806
+alt polyA (distinct terminal exon)	pooled	24763	5518	5518
+alt polyA (tandem, same exon)	pooled	24763	4196	4196

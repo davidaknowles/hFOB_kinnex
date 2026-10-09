@@ -29,9 +29,13 @@ print(de.direction.value_counts())
 lab = ["RUNX2", "SP7", "ALPL", "COL1A1", "SPP1", "IBSP", "BGLAP", "MKI67", "TOP2A", "HSPA1A", "HSPA1B", "DNAJB1",
        "RBM3", "CIRBP", "CDKN1A", "MDM2", "POSTN", "DKK1", "MGP", "TNFRSF11B"]
 d = de.copy(); d["mlog10p"] = -np.log10(d.pvals_adj.clip(lower=1e-300)); d["gene"] = d.index
-d["label"] = np.where(d.index.isin(lab) | (d.sig & (d.pb_log2FC.abs() > 3) & (d.cpm_day0 + d.cpm_day4 > 200)), d.index, "")
+hi = d[d.sig & (d.cpm_day0 + d.cpm_day4 > 100)]
+top = set(hi.nlargest(8, "pb_log2FC").index) | set(hi.nsmallest(8, "pb_log2FC").index)
+lab = ["RUNX2", "ALPL", "SPP1", "BGLAP", "COL1A2", "POSTN", "MKI67", "CCNB1", "RBM3", "CDKN1A", "MDM2"]
+d["label"] = np.where(d.index.isin(lab) | d.index.isin(top), d.index, "")
 p = (ggplot(d, aes("pb_log2FC", "mlog10p", color="direction")) + geom_point(size=0.4, alpha=0.5)
-     + geom_text(aes(label="label"), size=6, color="black", va="bottom", nudge_y=5)
+     + geom_text(d[d.label != ""], aes(label="label"), size=7, color="black",
+                 adjust_text={"arrowprops": {"arrowstyle": "-", "color": "grey", "lw": 0.5}})
      + scale_color_manual(values={"up day4": "#c0392b", "down day4": "#2e86c1", "ns": "#aaaaaa"})
      + theme_bw() + labs(x="pseudobulk log2FC (day4 / day0)", y="−log10 FDR (Wilcoxon)"))
 p.save(f"{FIG}/volcano_genes.png", width=8, height=6, dpi=150)

@@ -10,7 +10,7 @@ def _colsum(M):
     return np.asarray(M.sum(0)).ravel()
 
 
-def quasibinomial_two_group(Y, N, group, min_cells=20, min_total=50, floor_dispersion=True):
+def quasibinomial_two_group(Y, N, group, min_cells=20, min_total=50, floor_dispersion=True, chunk=2000):
     """Quasi-binomial Wald test of a difference in proportion between two groups, for each column.
 
     Y : cells x features sparse matrix of successes (e.g. inclusion / isoform counts)
@@ -19,6 +19,14 @@ def quasibinomial_two_group(Y, N, group, min_cells=20, min_total=50, floor_dispe
     The model is logit(p_cg) = a + b * group_c with Var(y) = phi * n p (1-p), equivalent to a quasi-binomial GLM
     with a single binary covariate. phi is estimated by Pearson chi2 over cells with n > 0.
     """
+    if Y.shape[1] > chunk:
+        Y, N = sp.csc_matrix(Y), sp.csc_matrix(N)
+        parts = [quasibinomial_two_group(Y[:, i:i + chunk], N[:, i:i + chunk], group, min_cells, min_total,
+                                         floor_dispersion, chunk) for i in range(0, Y.shape[1], chunk)]
+        df = pd.concat(parts, ignore_index=True)
+        df["padj"] = np.nan
+        df.loc[df.testable, "padj"] = multipletests(df.loc[df.testable, "pval"], method="fdr_bh")[1]
+        return df
     Y, N = sp.csr_matrix(Y, dtype=np.float64), sp.csr_matrix(N, dtype=np.float64)
     Ninv = N.copy()
     Ninv.data = 1.0 / Ninv.data

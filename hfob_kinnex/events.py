@@ -97,3 +97,10 @@ def group_incidence(labels, var_names):
     M = sp.csr_matrix((np.ones(ok.sum(), np.float32), (np.where(ok)[0], groups.get_indexer(lab[ok]))),
                       shape=(len(var_names), len(groups)))
     return M, groups
+
+
+def knn_smooth_ratio(conn, y, n, self_weight=1.0):
+    """kNN-smoothed proportion: (A y) / (A n) with A = connectivities + self_weight * I. Returns (psi, smoothed n)."""
+    A = conn + self_weight * sp.identity(conn.shape[0], format="csr")
+    ys, ns = A @ y, A @ n
+    return np.divide(ys, ns, out=np.full_like(ys, np.nan, dtype=float), where=ns > 0), ns

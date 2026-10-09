@@ -1,0 +1,4 @@
+__pycache__/
+*.h5ad
+*.parquet
+.ipynb_checkpoints/
